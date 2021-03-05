@@ -7,4 +7,8 @@ public final class AuthHelper {
     public static AWSCredentialsProvider getSystemPropertiesCredentialsProvider(){
         return new SystemPropertiesCredentialsProvider();
     }
+    private AuthHelper() {
+        throw new UnsupportedOperationException();
+    }
+
 }

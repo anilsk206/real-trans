@@ -1,28 +1,111 @@
-plugins {
-	id 'org.springframework.boot' version '2.4.3'
-	id 'io.spring.dependency-management' version '1.0.11.RELEASE'
-	id 'java'
-}
-
 group = 'com.test'
 version = '0.0.1-SNAPSHOT'
-sourceCompatibility = '1.8'
+
+buildscript {
+	ext {
+		springBootVersion = '2.3.4.RELEASE'
+		sys_user = System.env.SYS_USER
+		sys_pass = System.env.SYS_PASSWORD
+	}
+	repositories {
+		mavenCentral()
+	}
+	dependencies {
+		classpath("org.springframework.boot:spring-boot-gradle-plugin:${springBootVersion}")
+		classpath("org.openapitools:openapi-generator-gradle-plugin:4.2.3")
+	}
+}
+
+apply plugin: 'java'
+apply plugin: 'jacoco'
+apply plugin: 'maven-publish'
+apply plugin: 'org.springframework.boot'
+apply plugin: 'io.spring.dependency-management'
+apply plugin: 'org.openapi.generator'
+
+sourceCompatibility = 1.8
 
 repositories {
 	mavenCentral()
 }
 
 dependencies {
-
 	implementation group: 'org.springframework.boot', name: 'spring-boot-starter-webflux', version: '2.4.3'
-
 	testImplementation 'org.springframework.boot:spring-boot-starter-test'
 	implementation group: 'software.amazon.awssdk', name: 'transcribestreaming', version: '2.15.51'
 	implementation group: 'com.amazonaws', name: 'aws-java-sdk-kinesisvideo', version: '1.11.965'
 	runtimeOnly group: 'software.amazon.awssdk', name: 'netty-nio-client', version: '2.15.51'
-
 	implementation group: 'com.amazonaws', name: 'amazon-kinesis-video-streams-parser-library', version: '1.0.15'
+	implementation 'org.openapitools:jackson-databind-nullable:0.2.1'
+	implementation('org.springframework.boot:spring-boot-starter-webflux:2.3.4.RELEASE')
+	implementation 'io.springfox:springfox-swagger2:2.9.2'
+	implementation group: 'com.amazonaws', name: 'aws-java-sdk-apigatewaymanagementapi', version: '1.11.965'
+	implementation group: 'com.amazonaws', name: 'aws-java-sdk-core', version: '1.11.965'
+	implementation group: 'commons-io', name: 'commons-io', version: '2.4'
+	implementation group: 'org.apache.httpcomponents', name: 'httpasyncclient', version: '4.1.4'
+	implementation group: 'org.apache.commons', name: 'commons-lang3', version: '3.4'
+//	implementation('org.springframework.cloud:spring-cloud-starter-vault-config:2.2.6.RELEASE')
+	implementation group: 'javax.measure', name: 'jsr-275', version: '1.0.0'
+	implementation group: 'com.google.inject.extensions', name: 'guice-multibindings', version: '4.2.3'
+	implementation 'com.google.guava:guava:24.1.1-jre'
+	implementation group: 'org.owasp.encoder', name: 'encoder', version: '1.2'
+	//NOTE: The following dependency is needed because of https://github.com/spring-projects/spring-boot/wiki/Spring-Boot-2.3-Release-Notes#validation-starter-no-longer-included-in-web-starters
+	implementation 'org.springframework.boot:spring-boot-starter-validation'
+	compileOnly('org.projectlombok:lombok')
+	annotationProcessor 'org.projectlombok:lombok:1.18.8'
+	// https://mvnrepository.com/artifact/com.amazonaws/aws-java-sdk-ecs
+	implementation group: 'com.amazonaws', name: 'aws-java-sdk-ecs', version: '1.11.965'
+	implementation group: 'org.apache.commons', name: 'commons-lang3', version: '3.11'
+	testImplementation 'org.springframework.boot:spring-boot-starter-test'
+	implementation group: 'io.reactivex.rxjava2', name: 'rxjava', version: '2.2.2'
 }
+
+configurations {
+	runtime.exclude group: "org.slf4j", module: "slf4j-log4j12"
+	compile.exclude group: "org.slf4j", module: "slf4j-log4j12"
+}
+
+openApiGenerate {
+	generatorName = "spring"
+	library = "spring-boot"
+
+	inputSpec = "$rootDir/src/main/resources/specification.yml".toString()
+	outputDir = "${rootDir}/generated/openapi".toString()
+	systemProperties = [
+			modelDocs: "false",
+			models   : "",
+			apis     : "",
+	]
+	configOptions = [
+			useOptional          : "true",
+			swaggerDocketConfig  : "false",
+			performBeanValidation: "true",
+			useBeanValidation    : "true",
+			useTags              : "false",
+			singleContentTypes   : "true",
+			title                : rootProject.name,
+			java8                : "true",
+			dateLibrary          : "java8",
+			serializableModel    : "true",
+			serializationLibrary : "jackson",
+			skipDefaultInterface : "true",
+			artifactId           : rootProject.name,
+			apiPackage           : "com.test.realtrans.api",
+			modelPackage         : "com.test.realtrans.model",
+			invokerPackage       : "com.test.realtrans",
+			interfaceOnly        : "true"
+	]
+}
+
+sourceSets {
+	main {
+		java {
+			srcDir "${rootDir}/generated/openapi/src/main/java"
+		}
+	}
+}
+
+compileJava.dependsOn tasks.openApiGenerate
 
 test {
 	useJUnitPlatform()

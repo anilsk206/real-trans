@@ -1,0 +1,122 @@
+openapi: "3.0.0"
+info:
+  version: 1.0.0
+  title:  Image Forensics Provider for UDP
+  description: >-
+    API for invoking Enterprise Image Forensics application
+  contact:
+    name: AICOE
+    email: ESS-AICOE-iOCR@mycompany.com
+servers:
+  - url: https://platform-test.mycompany.com/
+paths:
+  /realTimeTranscription:
+    post:
+      tags:
+        - "Real Time Transcription"
+      summary: "Perform Real Time Transcription"
+      description: "Real Time Transcription"
+      parameters:
+        - $ref: '#/components/parameters/interactionId'
+        - $ref: '#/components/parameters/applicationId'
+        - $ref: '#/components/parameters/accept'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RealTimeTransRequest'
+
+      responses:
+
+        '200':
+          description: OK
+          headers:
+            'Interaction-Id':
+              $ref: '#/components/headers/Interaction-ID'
+            'Application-Id' :
+              $ref: '#/components/headers/Application-ID'
+            'Timestamp' :
+              $ref: '#/components/headers/Timestamp'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RealTimeTransResponse'
+        '400':
+          description: Bad Input
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorModel'
+        '403':
+          description: Cannot access directory
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorModel'
+        default:
+          description: Unexpected Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorModel'
+
+
+components:
+  headers:
+    Interaction-ID:
+      schema:
+        type: string
+        format: uuid
+      description: Unique identifier supplied in request
+    Application-ID:
+      schema:
+        type: string
+        description: Applicatoin Id of application provider.
+    Timestamp:
+      schema:
+        type: string
+        format: date-time
+        description: response time
+
+  parameters:
+    interactionId:
+      name: Interaction-ID
+      in: header
+      description: Unique identifier for this interaction
+      schema:
+        type: string
+        format: uuid
+    applicationId:
+      name: Application-ID
+      in: header
+      description: Unique identifier that tracks the request across applications.
+      schema:
+        type: string
+    accept:
+      name: Accept
+      in: header
+      description: "The requested content type for the response such as: application/xml , text/xml , application/json, text/javascript (for JSONP) Per the HTTP guidelines, this is just a hint and responses MAY have a different content type, such as a blob fetch where a successful response will just be the blob stream as the payload."
+      required: true
+      schema:
+        type: string
+
+
+  schemas:
+    RealTimeTransRequest:
+      type: string
+      example: "{}"
+      description: "Image analysis request details"
+
+    RealTimeTransResponse:
+      type: string
+
+    ErrorModel:
+      type: object
+      properties:
+        errorStatusCode:
+          type: integer
+          format: int32
+        errorCode:
+          type: string
+        message:
+          type: string

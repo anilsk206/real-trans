@@ -1,16 +1,15 @@
 package com.test.realtrans.utils;
 
 import com.amazonaws.auth.AWSCredentialsProvider;
+import com.amazonaws.auth.EnvironmentVariableCredentialsProvider;
+import com.amazonaws.auth.SystemPropertiesCredentialsProvider;
 import com.amazonaws.client.builder.AwsClientBuilder;
 import com.amazonaws.kinesisvideo.parser.ebml.MkvTypeInfos;
 import com.amazonaws.kinesisvideo.parser.mkv.*;
 import com.amazonaws.kinesisvideo.parser.utilities.FragmentMetadataVisitor;
 
 import com.amazonaws.regions.Regions;
-import com.amazonaws.services.kinesisvideo.AmazonKinesisVideo;
-import com.amazonaws.services.kinesisvideo.AmazonKinesisVideoClientBuilder;
-import com.amazonaws.services.kinesisvideo.AmazonKinesisVideoMedia;
-import com.amazonaws.services.kinesisvideo.AmazonKinesisVideoMediaClientBuilder;
+import com.amazonaws.services.kinesisvideo.*;
 import com.amazonaws.services.kinesisvideo.model.*;
 import com.test.realtrans.auth.AuthHelper;
 import com.test.realtrans.streaming.KVSTransactionIdTagProcessor;
@@ -19,6 +18,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.InputStream;
+import java.net.URI;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
@@ -122,20 +122,47 @@ public final class KinesisUtils {
     public static InputStream getInputStreamFromKVS(String streamArn,
                                                     Regions region,
                                                     String startFragmentNum) {
+        System.out.println("getInputStreamFromKVS - Validating arn, region and fragment #");
+
         Validate.notNull(streamArn);
         Validate.notNull(region);
-        Validate.notNull(startFragmentNum);
+//        Validate.notNull(startFragmentNum);
 
-        AmazonKinesisVideo amazonKinesisVideo = (AmazonKinesisVideo) AmazonKinesisVideoClientBuilder.standard().build();
+        System.out.println("getInputStreamFromKVS - Validated successfully arn, region and fragment #");
+//        AmazonKinesisVideo amazonKinesisVideo = (AmazonKinesisVideo) AmazonKinesisVideoClientBuilder.standard().build();
+//
+//        String endPoint = amazonKinesisVideo.getDataEndpoint(new GetDataEndpointRequest()
+//                .withAPIName(APIName.GET_MEDIA)
+//                .withStreamARN(streamArn)).getDataEndpoint();
 
-        String endPoint = amazonKinesisVideo.getDataEndpoint(new GetDataEndpointRequest()
-                .withAPIName(APIName.GET_MEDIA)
-                .withStreamARN(streamArn)).getDataEndpoint();
+//        AmazonKinesisVideoMediaClientBuilder amazonKinesisVideoMediaClientBuilder = AmazonKinesisVideoMediaClientBuilder.standard()
+//                .withEndpointConfiguration(new AwsClientBuilder.EndpointConfiguration(endPoint, region.getName()))
+//                .withCredentials(AuthHelper.getSystemPropertiesCredentialsProvider());
+//        AmazonKinesisVideoMedia amazonKinesisVideoMedia = amazonKinesisVideoMediaClientBuilder.build();
+
+        AmazonKinesisVideoAsyncClientBuilder amazonKinesisVideoAsyncClientBuilder = AmazonKinesisVideoAsyncClientBuilder.standard()
+                .withRegion(region.getName())
+                .withCredentials(new EnvironmentVariableCredentialsProvider());
+        final AmazonKinesisVideo frontendClient = amazonKinesisVideoAsyncClientBuilder.build();
+        final String endPoint = frontendClient.getDataEndpoint(
+                new GetDataEndpointRequest()
+                        .withStreamName(streamArn)
+                        .withAPIName(APIName.GET_MEDIA)).getDataEndpoint();
+
+        System.out.println("End point is : " + endPoint);
 
         AmazonKinesisVideoMediaClientBuilder amazonKinesisVideoMediaClientBuilder = AmazonKinesisVideoMediaClientBuilder.standard()
                 .withEndpointConfiguration(new AwsClientBuilder.EndpointConfiguration(endPoint, region.getName()))
-                .withCredentials(AuthHelper.getSystemPropertiesCredentialsProvider());
+                .withCredentials(new EnvironmentVariableCredentialsProvider());
+
         AmazonKinesisVideoMedia amazonKinesisVideoMedia = amazonKinesisVideoMediaClientBuilder.build();
+
+//        final AmazonKinesisVideoPutMedia dataClient = AmazonKinesisVideoPutMediaClient.builder()
+//                .withRegion(region.getName())
+//                .withEndpoint(URI.create(endPoint))
+//                .withCredentials(AuthHelper.getSystemPropertiesCredentialsProvider())
+//                .withConnectionTimeoutInMillis(CONNECTION_TIMEOUT_IN_MILLIS)
+//                .build();
 
         StartSelector startSelector;
         if (startFragmentNum != null)
@@ -149,7 +176,7 @@ public final class KinesisUtils {
 
 
         GetMediaResult getMediaResult = amazonKinesisVideoMedia.getMedia(new GetMediaRequest()
-                .withStreamARN(streamArn)
+                .withStreamName(streamArn)
                 .withStartSelector(startSelector));
 
         logger.info("GetMedia called on stream {} response {} requestId {}", streamArn,
