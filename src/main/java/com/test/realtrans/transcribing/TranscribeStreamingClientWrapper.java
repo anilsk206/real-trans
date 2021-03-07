@@ -101,30 +101,7 @@ public class TranscribeStreamingClientWrapper {
      *                        objects as they are received from the streaming service
      * @param inputFile optional input file to stream audio from. Will stream from the microphone if this is set to null
      */
-    public CompletableFuture<Void> startTranscription(StreamTranscriptionBehavior responseHandler, File inputFile) {
-        if (requestStream != null) {
-            throw new IllegalStateException("Stream is already open");
-        }
-        try {
-            int sampleRate = 16_000; //default
-            if (inputFile != null) {
-                sampleRate = (int) AudioSystem.getAudioInputStream(inputFile).getFormat().getSampleRate();
-                requestStream = new AudioStreamPublisher(getStreamFromFile(inputFile));
-            }
 
-            return client.startStreamTranscription(
-                    //Request parameters. Refer to API documentation for details.
-                    getRequest(sampleRate),
-                    //AudioEvent publisher containing "chunks" of audio data to transcribe
-                    requestStream,
-                    //Defines what to do with transcripts as they arrive from the service
-                    responseHandler);
-        } catch (UnsupportedAudioFileException | IOException ex) {
-            CompletableFuture<Void> failedFuture = new CompletableFuture<>();
-            failedFuture.completeExceptionally(ex);
-            return failedFuture;
-        }
-    }
 
     /**
      * Stop in-progress transcription if there is one in progress by closing the request stream
@@ -156,32 +133,10 @@ public class TranscribeStreamingClientWrapper {
         }
     }
 
-    /**
-     * Build an input stream from an audio file
-     * @param inputFile Name of the file containing audio to transcribe
-     * @return InputStream built from reading the file's audio
-     */
-    private static InputStream getStreamFromFile(File inputFile) {
-        try {
-            return new FileInputStream(inputFile);
-        } catch (FileNotFoundException e) {
-            throw new RuntimeException(e);
-        }
-    }
 
-    /**
-     * Build StartStreamTranscriptionRequestObject containing required parameters to open a streaming transcription
-     * request, such as audio sample rate and language spoken in audio
-     * @param mediaSampleRateHertz sample rate of the audio to be streamed to the service in Hertz
-     * @return StartStreamTranscriptionRequest to be used to open a stream to transcription service
-     */
-    private StartStreamTranscriptionRequest getRequest(Integer mediaSampleRateHertz) {
-        return StartStreamTranscriptionRequest.builder()
-                .languageCode(LanguageCode.EN_US.toString())
-                .mediaEncoding(MediaEncoding.PCM)
-                .mediaSampleRateHertz(mediaSampleRateHertz)
-                .build();
-    }
+
+
+
 
     /**
      * @return AWS credentials to be used to connect to Transcribe service. This example uses the default credentials

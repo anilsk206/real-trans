@@ -27,7 +27,7 @@ import javax.validation.constraints.*;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-@javax.annotation.Generated(value = "org.openapitools.codegen.languages.SpringCodegen", date = "2021-03-04T17:15:41.556-06:00[America/Chicago]")
+@javax.annotation.Generated(value = "org.openapitools.codegen.languages.SpringCodegen", date = "2021-03-07T16:37:01.296+05:30[Asia/Calcutta]")
 
 @Validated
 @Api(value = "realTimeTranscription", description = "the realTimeTranscription API")

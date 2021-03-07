@@ -39,21 +39,12 @@ public class RealTimeTranscriber {
         synchronousClient = new TranscribeStreamingSynchronousClient(TranscribeStreamingClientWrapper.getClient(),awsUtils);
     }
 
-    private String startFileTranscriptionRequest(File inputFile) {
-        return synchronousClient.transcribeFile(inputFile);
-    }
-
 
     public String initialize() throws Exception {
-        String suggestions = "";
-        Path saveAudioFilePath = Paths.get("src/main/resources/",
-                "audio"+ ".raw");
-        FileOutputStream fileOutputStream = new FileOutputStream(saveAudioFilePath.toString());
-        InputStream kvsInputStream = KinesisUtils.getInputStreamFromKVS(streamName, Regions.US_EAST_1, null);
-        StreamingMkvReader streamingMkvReader = StreamingMkvReader
-                .createDefault(new InputStreamParserByteSource(kvsInputStream));
-        FragmentMetadataVisitor fragmentVisitor = FragmentMetadataVisitor.create();
+        return synchronousClient.transcribeFile();
+        //String suggestions = "";
 
+/*
         try{
             while(true)
             {
@@ -73,13 +64,10 @@ public class RealTimeTranscriber {
             kvsInputStream.close();
             fileOutputStream.close();
         }
-        /*ClassLoader classLoader = getClass().getClassLoader();
-        final InputStream inputStream = classLoader.getResourceAsStream(MKV_FILE_PATH);*/
-        File inputFile = new File("src/main/resources/audio.raw");
-        if (inputFile != null) {
-            suggestions = startFileTranscriptionRequest(inputFile);
-        }
-        return  suggestions;
+        *//*ClassLoader classLoader = getClass().getClassLoader();
+        final InputStream inputStream = classLoader.getResourceAsStream(MKV_FILE_PATH);*//*
+        File inputFile = new File("src/main/resources/audio.raw");*/
+
     }
 
     private void stopTranscription() {
