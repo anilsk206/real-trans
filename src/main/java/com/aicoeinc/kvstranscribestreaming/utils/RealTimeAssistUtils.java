@@ -27,14 +27,16 @@ public class RealTimeAssistUtils {
     /* connect timeout */
     private static final int CONNECTION_TIMEOUT_IN_MILLIS = 10_000;
 
-//    @Autowired
-    private RestTemplate restTemplate = new RestTemplate();
+    public static StringBuffer insights = new StringBuffer();
 
-    public ResponseEntity<String> get(HttpHeaders headers, String url) {
+//    @Autowired
+    private static RestTemplate restTemplate = new RestTemplate();
+
+    public static ResponseEntity<String> get(HttpHeaders headers, String url) {
         return restTemplate.exchange(url, HttpMethod.GET, new HttpEntity<>(headers), String.class);
     }
 
-    public ResponseEntity<String> post(String body, HttpHeaders headers, String url) {
+    public static ResponseEntity<String> post(String body, HttpHeaders headers, String url) {
         HttpEntity<String> entity = new HttpEntity<>(body, headers);
         return restTemplate.postForEntity(url, entity, String.class);
     }

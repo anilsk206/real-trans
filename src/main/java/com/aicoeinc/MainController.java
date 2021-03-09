@@ -7,6 +7,9 @@ import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RestController;
+import reactor.core.publisher.Flux;
+
+import java.time.Duration;
 
 @RestController
 public class MainController {
@@ -29,14 +32,15 @@ public class MainController {
                 .map(it -> TransConstants.RECOMMENDATIONS[random.nextInt(8)]);
     }
     */
-    public String getRealTimeAssist(@PathVariable(required = false) String id) throws Exception {
+    public Flux<String> getRealTimeAssist(@PathVariable(required = false) String id) throws Exception {
         System.out.println("UCID : "+ id);
 
         String ucidInfo = getUCIDInfo(id);
         KVSTranscribeStreamingHandler handler = new KVSTranscribeStreamingHandler();
         handler.handleRequest(ucidInfo);
 
-        return "Success";
+        return Flux.interval(Duration.ofSeconds(5))
+                .map(it -> RealTimeAssistUtils.insights.toString());
     }
 
     public String getUCIDInfo(String id) {
