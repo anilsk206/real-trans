@@ -15,21 +15,24 @@ import java.util.List;
 
 public class TranscriptionPublisherImpl implements TranscriptionPublisher {
     private String finalTranscript = "";
-    String insights = "";
+
     @Override
     public void publish(TranscriptEvent e) {
         List<Result> results = e.transcript().results();
-        System.out.println("transcribe results size ........"+results.size());
+//        System.out.println("Transcribe results size ........"+results.size());
         if(results.size()>0) {
             Result firstResult = results.get(0);
             if (firstResult.alternatives().size() > 0 &&
                     !firstResult.alternatives().get(0).transcript().isEmpty()) {
                 String transcript = firstResult.alternatives().get(0).transcript();
+//                System.out.printf("Transcript is %s and result is %s%n",
+//                        transcript.isEmpty() ? "empty" : "not empty",
+//                        firstResult.isPartial() ? "partial" : "final");
                 if(!transcript.isEmpty() && !firstResult.isPartial()) {
-                    System.out.println("Transcribe output "+transcript);
+                    System.out.println("Transcribed text: " + transcript);
                     finalTranscript += transcript;
                     // TODO: getRealTimeInsights function makes a POST call to the ASSIST service to get the insights
-                    getRealTimeInsights(finalTranscript);
+                    // getRealTimeInsights(finalTranscript);
 
                     // TODO: Send back the FLUX event to the client.
                     // Call a method in RealTimeAssistUtils and pass the insight. That method should send the FLUX
@@ -64,6 +67,5 @@ public class TranscriptionPublisherImpl implements TranscriptionPublisher {
     @Override
     public void publishDone() {
         System.out.println("Transcription Ended");
-
     }
 }

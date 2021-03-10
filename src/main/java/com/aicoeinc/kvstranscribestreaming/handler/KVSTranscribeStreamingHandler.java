@@ -31,7 +31,6 @@ import software.amazon.awssdk.services.transcribestreaming.model.LanguageCode;
 import software.amazon.awssdk.services.transcribestreaming.model.MediaEncoding;
 import software.amazon.awssdk.services.transcribestreaming.model.StartStreamTranscriptionRequest;
 
-import java.io.IOException;
 import java.io.InputStream;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
@@ -44,34 +43,20 @@ import java.util.concurrent.CompletableFuture;
 /**
  * Demonstrate Amazon VoiceConnectors's real-time transcription feature using
  * AWS Kinesis Video Streams and AWS Transcribe. The data flow is :
- *
+ * <p>
  * Amazon CloudWatch Events => Amazon SQS => AWS Lambda => AWS Transcribe => AWS
  * DynamoDB & S3
  */
 
 @NoArgsConstructor
 public class KVSTranscribeStreamingHandler {
-
-    private static final int CHUNK_SIZE_IN_KB = 4;
     private static final Regions REGION = Regions.fromName(System.getenv("AWS_REGION"));
     private static final String TRANSCRIBE_ENDPOINT = "https://transcribestreaming." + REGION.getName()
             + ".amazonaws.com";
-    private static final String RECORDINGS_BUCKET_NAME = System.getenv("RECORDINGS_BUCKET_NAME");
-    private static final String RECORDINGS_KEY_PREFIX = "voiceConnectorToKVS_";
-    private static final boolean CONSOLE_LOG_TRANSCRIPT_FLAG = true;
-    private static final boolean RECORDINGS_PUBLIC_READ_ACL = false;
-
-    // Lambda maximum timeout is 900 seconds(15 minutes). 5-second buffer is for handler's post actions(stream close, audio upload, etc)
-    private static final int LAMBDA_RECORDING_TIMEOUT_IN_SECOND = 895;
 
     private static final Logger logger = LoggerFactory.getLogger(KVSTranscribeStreamingHandler.class);
     public static final MetricsUtil metricsUtil = new MetricsUtil(AmazonCloudWatchClientBuilder.defaultClient());
     private static final DateFormat DATE_FORMAT = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS");
-
-    private final Boolean shouldWriteAudioToFile = Boolean.TRUE;
-
-//    private static final DynamoDB dynamoDB = new DynamoDB(
-//            AmazonDynamoDBClientBuilder.standard().withRegion(REGION.getName()).build());
 
     private static final ObjectMapper objectMapper = new ObjectMapper()
             .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
@@ -126,59 +111,32 @@ public class KVSTranscribeStreamingHandler {
         KVSTransactionIdTagProcessor tagProcessor = new KVSTransactionIdTagProcessor(transactionId);
         FragmentMetadataVisitor fragmentVisitor = FragmentMetadataVisitor.create(Optional.of(tagProcessor));
 
-            try (TranscribeStreamingRetryClient client = new TranscribeStreamingRetryClient(getTranscribeCredentials(),
-                    TRANSCRIBE_ENDPOINT, REGION, metricsUtil)) {
+        try (TranscribeStreamingRetryClient client = new TranscribeStreamingRetryClient(getTranscribeCredentials(),
+                TRANSCRIBE_ENDPOINT, REGION, metricsUtil)) {
 
-                logger.info("Calling Transcribe service..");
+            logger.info("Calling Transcribe service..");
 
-                List<TranscriptionPublisher> publishers = Arrays.asList(new TranscriptionPublisherImpl());
+            List<TranscriptionPublisher> publishers = Arrays.asList(new TranscriptionPublisherImpl());
 
-                CompletableFuture<Void> result = client.startStreamTranscription(
-                        // since we're definitely working with telephony audio, we know that's 8 kHz
-                        getRequest(8000),
-                        new KVSAudioStreamPublisher(streamingMkvReader, transactionId, tagProcessor, fragmentVisitor),
-                        new StreamTranscriptionBehaviorImpl(publishers));
+            CompletableFuture<Void> result = client.startStreamTranscription(
+                    // since we're definitely working with telephony audio, we know that's 8 kHz
+                    getRequest(8000),
+                    new KVSAudioStreamPublisher(streamingMkvReader, transactionId, tagProcessor, fragmentVisitor),
+                    new StreamTranscriptionBehaviorImpl(publishers));
 
-                result.get();
-            } catch (Exception e) {
-                logger.error("Error during streaming: ", e);
-                throw e;
+            result.get();
+        } catch (Exception e) {
+            logger.error("Error during streaming: ", e);
+            throw e;
 
-            } finally {
-                kvsInputStream.close();
-            }
-    }
-
-    /**
-     * Closes the FileOutputStream and uploads the Raw audio file to S3
-     *
-     * @param kvsInputStream
-     * @param fileOutputStream
-     * @param saveAudioFilePath
-     * @param transactionId
-     * @throws IOException
-     */
-    /*
-    private void closeFileAndUploadRawAudio(InputStream kvsInputStream, FileOutputStream fileOutputStream,
-            Path saveAudioFilePath, String transactionId, String startTime) throws IOException {
-
-        kvsInputStream.close();
-        fileOutputStream.close();
-
-        // Upload the Raw Audio file to S3
-        if (new File(saveAudioFilePath.toString()).length() > 0) {
-            AudioUtils.uploadRawAudio(REGION, RECORDINGS_BUCKET_NAME, RECORDINGS_KEY_PREFIX,
-                    saveAudioFilePath.toString(), transactionId, startTime, RECORDINGS_PUBLIC_READ_ACL, getAWSCredentials());
-        } else {
-            logger.info("Skipping upload to S3. Audio file has 0 bytes: " + saveAudioFilePath);
+        } finally {
+            kvsInputStream.close();
         }
     }
-    */
-
 
     /**
      * @return AWS credentials to be used to connect to s3 (for fetching and
-     *         uploading audio) and KVS
+     * uploading audio) and KVS
      */
     private static AWSCredentialsProvider getAWSCredentials() {
         return DefaultAWSCredentialsProviderChain.getInstance();
@@ -186,9 +144,9 @@ public class KVSTranscribeStreamingHandler {
 
     /**
      * @return AWS credentials to be used to connect to Transcribe service. This
-     *         example uses the default credentials provider, which looks for
-     *         environment variables (AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY)
-     *         or a credentials file on the system running this program.
+     * example uses the default credentials provider, which looks for
+     * environment variables (AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY)
+     * or a credentials file on the system running this program.
      */
     private static AwsCredentialsProvider getTranscribeCredentials() {
         return DefaultCredentialsProvider.create();
@@ -202,7 +160,7 @@ public class KVSTranscribeStreamingHandler {
      * @param mediaSampleRateHertz sample rate of the audio to be streamed to the
      *                             service in Hertz
      * @return StartStreamTranscriptionRequest to be used to open a stream to
-     *         transcription service
+     * transcription service
      */
     private static StartStreamTranscriptionRequest getRequest(Integer mediaSampleRateHertz) {
         return StartStreamTranscriptionRequest.builder().languageCode(LanguageCode.EN_US.toString())
@@ -234,5 +192,4 @@ public class KVSTranscribeStreamingHandler {
                     fragmentVisitor));
         }
     }
-
 }
