@@ -50,7 +50,7 @@ import java.util.concurrent.CompletableFuture;
 
 @NoArgsConstructor
 public class KVSTranscribeStreamingHandler {
-    private static final Regions REGION = Regions.fromName(System.getenv("AWS_REGION"));
+    private static final Regions REGION = Regions.US_EAST_1;
     private static final String TRANSCRIBE_ENDPOINT = "https://transcribestreaming." + REGION.getName()
             + ".amazonaws.com";
 

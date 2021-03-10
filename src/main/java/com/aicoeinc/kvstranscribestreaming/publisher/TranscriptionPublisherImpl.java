@@ -32,7 +32,7 @@ public class TranscriptionPublisherImpl implements TranscriptionPublisher {
                     System.out.println("Transcribed text: " + transcript);
                     finalTranscript += transcript;
                     // TODO: getRealTimeInsights function makes a POST call to the ASSIST service to get the insights
-                    // getRealTimeInsights(finalTranscript);
+                    getRealTimeInsights(finalTranscript);
 
                     // TODO: Send back the FLUX event to the client.
                     // Call a method in RealTimeAssistUtils and pass the insight. That method should send the FLUX
@@ -57,8 +57,9 @@ public class TranscriptionPublisherImpl implements TranscriptionPublisher {
             jsonGenerator.writeFieldName("text");
             jsonGenerator.writeString(finalTranscript);
             jsonGenerator.writeEndObject();
+            jsonGenerator.close();
             ResponseEntity<String> insightsJson = RealTimeAssistUtils.post(stringWriter.toString(),httpHeaders,url);
-            RealTimeAssistUtils.insights.append(insightsJson.getBody());
+            RealTimeAssistUtils.insights.append(" "+insightsJson.getBody());
         }catch (Exception e){
             e.printStackTrace();
         }

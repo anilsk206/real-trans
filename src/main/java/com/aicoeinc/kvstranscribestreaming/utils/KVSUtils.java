@@ -135,6 +135,8 @@ public final class KVSUtils {
                 .withAPIName(APIName.GET_MEDIA)
                 .withStreamARN(streamArn)).getDataEndpoint();
 
+        System.out.println("endpoint ......."+endPoint);
+
         AmazonKinesisVideoMediaClientBuilder amazonKinesisVideoMediaClientBuilder = AmazonKinesisVideoMediaClientBuilder.standard()
                 .withEndpointConfiguration(new AwsClientBuilder.EndpointConfiguration(endPoint, region.getName()))
                 .withCredentials(awsCredentialsProvider);

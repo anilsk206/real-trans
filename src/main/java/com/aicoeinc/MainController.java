@@ -2,7 +2,9 @@ package com.aicoeinc;
 
 import com.aicoeinc.kvstranscribestreaming.handler.KVSTranscribeStreamingHandler;
 import com.aicoeinc.kvstranscribestreaming.utils.RealTimeAssistUtils;
+import org.springframework.boot.CommandLineRunner;
 import org.springframework.http.MediaType;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -19,6 +21,8 @@ public class MainController {
         this.realTimeAssistUtils = realTimeAssistUtils;
     }
 
+    public String transID = "";
+
     @CrossOrigin(allowedHeaders = "*")
     @GetMapping(value = "/event/getInsights/{id}", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     /*
@@ -34,13 +38,19 @@ public class MainController {
     */
     public Flux<String> getRealTimeAssist(@PathVariable(required = false) String id) throws Exception {
         System.out.println("UCID : "+ id);
-
-        String ucidInfo = getUCIDInfo(id);
-        KVSTranscribeStreamingHandler handler = new KVSTranscribeStreamingHandler();
-        handler.handleRequest(ucidInfo);
-
+        transID = id;
+        realTimeAssistUtils.transcribe(transID).thenAccept(s -> System.out.println("transcribe returned: " + s));
+        System.out.println("main thread ............");
         return Flux.interval(Duration.ofSeconds(5))
                 .map(it -> RealTimeAssistUtils.insights.toString());
+    }
+
+    /*@Async
+    public void transcribe() {
+        System.out.println("child thread ...................");
+        String ucidInfo = getUCIDInfo("");
+        KVSTranscribeStreamingHandler handler = new KVSTranscribeStreamingHandler();
+        handler.handleRequest(ucidInfo);
     }
 
     public String getUCIDInfo(String id) {
@@ -86,7 +96,7 @@ public class MainController {
                 "    }\n" +
                 "}";
         return payload;
-    }
+    }*/
 }
 
 
