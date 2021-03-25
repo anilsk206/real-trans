@@ -1,5 +1,6 @@
 package com.aicoeinc.kvstranscribestreaming.handler;
 
+import com.aicoeinc.db.TranscriptsRepository;
 import com.aicoeinc.kvstranscribestreaming.publisher.TranscriptionPublisher;
 import com.aicoeinc.kvstranscribestreaming.publisher.TranscriptionPublisherImpl;
 import com.aicoeinc.kvstranscribestreaming.streaming.KVSTransactionIdTagProcessor;
@@ -8,8 +9,8 @@ import com.aicoeinc.kvstranscribestreaming.transcribe.StreamTranscriptionBehavio
 import com.aicoeinc.kvstranscribestreaming.transcribe.TranscribeStreamingRetryClient;
 import com.aicoeinc.kvstranscribestreaming.utils.KVSUtils;
 import com.aicoeinc.kvstranscribestreaming.utils.MetricsUtil;
-import com.aicoeinc.streamingeventmodel.StreamingStatus;
-import com.aicoeinc.streamingeventmodel.StreamingStatusStartedDetail;
+import com.aicoeinc.model.streamingevent.StreamingStatus;
+import com.aicoeinc.model.streamingevent.StreamingStatusStartedDetail;
 import com.amazonaws.auth.AWSCredentialsProvider;
 import com.amazonaws.auth.DefaultAWSCredentialsProviderChain;
 import com.amazonaws.kinesisvideo.parser.ebml.InputStreamParserByteSource;
@@ -24,6 +25,8 @@ import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Component;
 import software.amazon.awssdk.auth.credentials.AwsCredentialsProvider;
 import software.amazon.awssdk.auth.credentials.DefaultCredentialsProvider;
 import software.amazon.awssdk.services.transcribestreaming.model.AudioStream;
@@ -49,6 +52,7 @@ import java.util.concurrent.CompletableFuture;
  */
 
 @NoArgsConstructor
+@Component
 public class KVSTranscribeStreamingHandler {
     private static final Regions REGION = Regions.US_EAST_1;
     private static final String TRANSCRIBE_ENDPOINT = "https://transcribestreaming." + REGION.getName()
@@ -58,14 +62,23 @@ public class KVSTranscribeStreamingHandler {
     public static final MetricsUtil metricsUtil = new MetricsUtil(AmazonCloudWatchClientBuilder.defaultClient());
     private static final DateFormat DATE_FORMAT = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS");
 
+//    private MongoTemplate transcriptsDB = new DocDBConfig().mongoTemplate();
+
+    @Autowired
+    TranscriptsRepository transcriptsDB;
+
     private static final ObjectMapper objectMapper = new ObjectMapper()
             .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
 
     public String handleRequest(String eventBody) {
         try {
 
-            Map<String, Object> eventBodyMap = objectMapper.readValue(eventBody, Map.class);
-            Map<String, String> eventDetail = (Map) eventBodyMap.get("detail");
+            // If events are directed through event bridge then uncomment the below lines
+            // Map<String, Object> eventBodyMap = objectMapper.readValue(eventBody, Map.class);
+            // Map<String, String> eventDetail = (Map) eventBodyMap.get("detail");
+
+            // If Chime is sending events to SQS then the body contains the detail record itself.
+            Map<String, String> eventDetail = objectMapper.readValue(eventBody, Map.class);
 
             String streamingStatus = eventDetail.get("streamingStatus");
             String transactionId = eventDetail.get("transactionId");
@@ -116,7 +129,7 @@ public class KVSTranscribeStreamingHandler {
 
             logger.info("Calling Transcribe service..");
 
-            List<TranscriptionPublisher> publishers = Arrays.asList(new TranscriptionPublisherImpl());
+            List<TranscriptionPublisher> publishers = Arrays.asList(new TranscriptionPublisherImpl(detail, transcriptsDB));
 
             CompletableFuture<Void> result = client.startStreamTranscription(
                     // since we're definitely working with telephony audio, we know that's 8 kHz
@@ -164,7 +177,9 @@ public class KVSTranscribeStreamingHandler {
      */
     private static StartStreamTranscriptionRequest getRequest(Integer mediaSampleRateHertz) {
         return StartStreamTranscriptionRequest.builder().languageCode(LanguageCode.EN_US.toString())
-                .mediaEncoding(MediaEncoding.PCM).mediaSampleRateHertz(mediaSampleRateHertz).build();
+                .mediaEncoding(MediaEncoding.PCM).mediaSampleRateHertz(mediaSampleRateHertz)
+//                .enableChannelIdentification(true).numberOfChannels(2)
+                .build();
     }
 
     /**

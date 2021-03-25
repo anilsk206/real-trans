@@ -181,6 +181,8 @@ public class TranscribeStreamingRetryClient implements AutoCloseable {
         return StartStreamTranscriptionRequest.builder()
                 .languageCode(request.languageCode())
                 .mediaEncoding(request.mediaEncoding())
+//                .enableChannelIdentification(true)
+//                .numberOfChannels(2)
                 .mediaSampleRateHertz(request.mediaSampleRateHertz())
                 .sessionId(UUID.randomUUID().toString())
                 .build();

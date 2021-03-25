@@ -1,4 +1,4 @@
-package com.aicoeinc.streamingeventmodel;
+package com.aicoeinc.model.streamingevent;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;

@@ -1,2 +1,16 @@
 server:
     port: 8081
+
+cloud:
+    aws:
+        region:
+            static: us-east-1
+            auto: false
+        sqs:
+            endpointUri: https://sqs.us-east-1.amazonaws.com/603205347373/ChimeVoiceConnector-Streaming-ba7fk1oqnmwzh9ubf8sgnj
+
+spring:
+    data:
+        mongodb:
+            uri: "mongodb://localhost:27017/realinsights"
+            database: realinsights

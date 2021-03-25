@@ -1,72 +1,94 @@
 package com.aicoeinc.kvstranscribestreaming.publisher;
 
-import com.aicoeinc.kvstranscribestreaming.utils.RealTimeAssistUtils;
-import com.fasterxml.jackson.core.JsonFactory;
-import com.fasterxml.jackson.core.JsonGenerator;
+import com.aicoeinc.db.TranscriptsRepository;
+import com.aicoeinc.model.streamingevent.StreamingStatusDetail;
+import com.aicoeinc.model.transcript.TranscriptResult;
+import com.fasterxml.jackson.annotation.JsonAutoDetect;
+import com.fasterxml.jackson.annotation.PropertyAccessor;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.MediaType;
-import org.springframework.http.ResponseEntity;
+import org.apache.commons.lang3.Validate;
 import software.amazon.awssdk.services.transcribestreaming.model.Result;
+import software.amazon.awssdk.services.transcribestreaming.model.Transcript;
 import software.amazon.awssdk.services.transcribestreaming.model.TranscriptEvent;
 
-import java.io.StringWriter;
+import java.util.Date;
 import java.util.List;
 
 public class TranscriptionPublisherImpl implements TranscriptionPublisher {
-    private String finalTranscript = "";
+    private final ObjectMapper mapper;
+    private final TranscriptsRepository transcriptsCollection;
+    private final String transactionId;
+    private final String callId;
+    private final Boolean isCaller;
+    private final String voiceConnector;
+    private final String direction;
+    private final String fromNumber;
+    private final String toNumber;
+    private final String channelId;
+
+    public TranscriptionPublisherImpl(StreamingStatusDetail streamingStatusStartedDetail, TranscriptsRepository dbClient) {
+        this.transcriptsCollection = Validate.notNull(dbClient);
+        this.transactionId = Validate.notNull(streamingStatusStartedDetail.getTransactionId());
+        this.callId = streamingStatusStartedDetail.getCallId();
+        this.isCaller = streamingStatusStartedDetail.getIsCaller();
+        this.voiceConnector = streamingStatusStartedDetail.getVoiceConnectorId();
+        this.direction = streamingStatusStartedDetail.getDirection().name();
+        this.fromNumber = streamingStatusStartedDetail.getFromNumber();
+        this.toNumber = streamingStatusStartedDetail.getToNumber();
+
+        // TODO: Set the channel Id in the transcript result appropriately.
+        // In this PoC setup, always customer makes the call. So setting it accordingly!
+        this.channelId = isCaller == true ? "agent" : "customer";
+
+        mapper = new ObjectMapper();
+        mapper.setVisibility(PropertyAccessor.ALL, JsonAutoDetect.Visibility.NONE);
+        mapper.setVisibility(PropertyAccessor.FIELD, JsonAutoDetect.Visibility.ANY);
+    }
 
     @Override
     public void publish(TranscriptEvent e) {
         List<Result> results = e.transcript().results();
-//        System.out.println("Transcribe results size ........"+results.size());
         if(results.size()>0) {
             Result firstResult = results.get(0);
             if (firstResult.alternatives().size() > 0 &&
                     !firstResult.alternatives().get(0).transcript().isEmpty()) {
                 String transcript = firstResult.alternatives().get(0).transcript();
-//                System.out.printf("Transcript is %s and result is %s%n",
-//                        transcript.isEmpty() ? "empty" : "not empty",
-//                        firstResult.isPartial() ? "partial" : "final");
                 if(!transcript.isEmpty() && !firstResult.isPartial()) {
+                    try {
+                        transcriptsCollection.insert(getTranscriptResult(e.transcript()));
+                    } catch (JsonProcessingException jsonProcessingException) {
+                        jsonProcessingException.printStackTrace();
+                    } catch (Exception exc) {
+                        exc.printStackTrace();
+                    }
                     System.out.println("Transcribed text: " + transcript);
-                    finalTranscript += transcript;
-                    // TODO: getRealTimeInsights function makes a POST call to the ASSIST service to get the insights
-                    getRealTimeInsights(finalTranscript);
-
-                    // TODO: Send back the FLUX event to the client.
-                    // Call a method in RealTimeAssistUtils and pass the insight. That method should send the FLUX
-                    // event back to client
                 }
             }
-        }
-    }
-
-    private void getRealTimeInsights(String finalTranscript) {
-        final ObjectMapper objectMapper = new ObjectMapper();
-        HttpHeaders httpHeaders = new HttpHeaders();
-        httpHeaders.setContentType(MediaType.APPLICATION_JSON);
-        JsonFactory jsonFactory = new JsonFactory();
-        StringWriter stringWriter = new StringWriter();
-        JsonGenerator jsonGenerator = null;
-        String url = "http://localhost:8080/mockAnalysis";
-        try{
-            jsonGenerator = jsonFactory.createGenerator(stringWriter);
-            jsonGenerator.useDefaultPrettyPrinter();
-            jsonGenerator.writeStartObject();
-            jsonGenerator.writeFieldName("text");
-            jsonGenerator.writeString(finalTranscript);
-            jsonGenerator.writeEndObject();
-            jsonGenerator.close();
-            ResponseEntity<String> insightsJson = RealTimeAssistUtils.post(stringWriter.toString(),httpHeaders,url);
-            RealTimeAssistUtils.insights.append(" "+insightsJson.getBody());
-        }catch (Exception e){
-            e.printStackTrace();
         }
     }
 
     @Override
     public void publishDone() {
         System.out.println("Transcription Ended");
+    }
+
+    public TranscriptResult getTranscriptResult(Transcript transcript) throws JsonProcessingException {
+        String transcriptJson = mapper.writeValueAsString(transcript);
+        System.out.println(transcriptJson);
+
+        return TranscriptResult.builder()
+                .transactionId(this.transactionId)
+                .callId(this.callId)
+                .channelId(this.channelId)
+                .startTime((long) (transcript.results().get(0).startTime() * 1000))
+                .direction(this.direction)
+                .fromNumber(this.fromNumber)
+                .isCaller(this.isCaller)
+                .toNumber(this.toNumber)
+                .voiceConnector(this.voiceConnector)
+                .transcript(transcriptJson)
+                .row_create_ts(new Date())
+                .build();
     }
 }

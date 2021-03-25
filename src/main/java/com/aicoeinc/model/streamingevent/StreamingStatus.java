@@ -1,4 +1,4 @@
-package com.aicoeinc.streamingeventmodel;
+package com.aicoeinc.model.streamingevent;
 
 public enum StreamingStatus {
     STARTED,

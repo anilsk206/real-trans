@@ -58,6 +58,10 @@ dependencies {
 	implementation group: 'org.apache.commons', name: 'commons-lang3', version: '3.11'
 	testImplementation 'org.springframework.boot:spring-boot-starter-test'
 	implementation group: 'io.reactivex.rxjava2', name: 'rxjava', version: '2.2.2'
+	implementation group: 'org.springframework.boot', name: 'spring-boot-starter-data-mongodb'
+//	implementation group: 'org.springframework.cloud', name: 'spring-cloud-starter-aws'
+//	implementation group: 'org.springframework.cloud', name: 'spring-cloud-aws-messaging', version: '2.2.6.RELEASE'
+	implementation group: 'com.jashmore', name: 'java-dynamic-sqs-listener-spring-starter', version: '4.4.0'
 }
 
 configurations {
