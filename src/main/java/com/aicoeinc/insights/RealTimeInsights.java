@@ -92,6 +92,9 @@ public class RealTimeInsights {
 
         // For this Mock Service, just get a few insights at a time - so that we can show updates in UI
         int insightsAtATime = 1;
+
+        // While this code can be optimized to get the first element instead of creating subLists,
+        // keeping this as below to have quick edits if we want to show more than one insights each time.
         List<String> insightsSubset = new ArrayList<String>(insights.keySet());
         Collections.shuffle(insightsSubset);
         List<String> insightsSubsetKeys = insightsAtATime > insightsSubset.size() ? insightsSubset.subList(0, insightsSubset.size()) :
@@ -101,9 +104,18 @@ public class RealTimeInsights {
         }
 
         //TODO: How can we show this as a table on frontend
-        return this.insights.entrySet().stream()
-                .map(entry -> entry.getKey() + " --> " + entry.getValue())
-                .collect(Collectors.joining("\n\n"));
+//        return this.insights.entrySet().stream()
+//                .map(entry -> entry.getKey() + " --> " + entry.getValue())
+//                .collect(Collectors.joining("\n\n"));
+
+        //TODO: The below code can be optimized to send a json. Frontend will handle the json and display however it wants.
+        String insightsJson = "";
+        try {
+            insightsJson = objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(this.insights);
+        } catch (JsonProcessingException e) {
+            e.printStackTrace();
+        }
+        return insightsJson;
     }
 
     // Tactical method to get the insights. Needs to be updated with real/mocked service call
