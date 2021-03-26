@@ -1,5 +1,6 @@
 package com.aicoeinc.kvstranscribestreaming.handler;
 
+import com.aicoeinc.db.CallStatusRepository;
 import com.aicoeinc.db.TranscriptsRepository;
 import com.aicoeinc.kvstranscribestreaming.publisher.TranscriptionPublisher;
 import com.aicoeinc.kvstranscribestreaming.publisher.TranscriptionPublisherImpl;
@@ -9,8 +10,11 @@ import com.aicoeinc.kvstranscribestreaming.transcribe.StreamTranscriptionBehavio
 import com.aicoeinc.kvstranscribestreaming.transcribe.TranscribeStreamingRetryClient;
 import com.aicoeinc.kvstranscribestreaming.utils.KVSUtils;
 import com.aicoeinc.kvstranscribestreaming.utils.MetricsUtil;
+import com.aicoeinc.model.dbCollections.CallStatus;
 import com.aicoeinc.model.streamingevent.StreamingStatus;
+import com.aicoeinc.model.streamingevent.StreamingStatusEndedOrFailedDetail;
 import com.aicoeinc.model.streamingevent.StreamingStatusStartedDetail;
+import com.aicoeinc.model.dbCollections.TranscriptResult;
 import com.amazonaws.auth.AWSCredentialsProvider;
 import com.amazonaws.auth.DefaultAWSCredentialsProviderChain;
 import com.amazonaws.kinesisvideo.parser.ebml.InputStreamParserByteSource;
@@ -37,10 +41,7 @@ import software.amazon.awssdk.services.transcribestreaming.model.StartStreamTran
 import java.io.InputStream;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
 import java.util.concurrent.CompletableFuture;
 
 /**
@@ -62,10 +63,11 @@ public class KVSTranscribeStreamingHandler {
     public static final MetricsUtil metricsUtil = new MetricsUtil(AmazonCloudWatchClientBuilder.defaultClient());
     private static final DateFormat DATE_FORMAT = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS");
 
-//    private MongoTemplate transcriptsDB = new DocDBConfig().mongoTemplate();
+    @Autowired
+    TranscriptsRepository transcriptsCollection;
 
     @Autowired
-    TranscriptsRepository transcriptsDB;
+    CallStatusRepository callStatusCollection;
 
     private static final ObjectMapper objectMapper = new ObjectMapper()
             .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
@@ -87,9 +89,25 @@ public class KVSTranscribeStreamingHandler {
             if (StreamingStatus.STARTED.name().equals(streamingStatus)) {
                 final StreamingStatusStartedDetail streamingStatusStartedDetail = objectMapper.convertValue(eventDetail,
                         StreamingStatusStartedDetail.class);
-
-                logger.info("[{}] Streaming status {} , EventDetail: {}", transactionId, streamingStatus, streamingStatusStartedDetail);
+                logger.info("[{}] Streaming status {} , EventDetail: {}", transactionId, streamingStatus,
+                        streamingStatusStartedDetail);
+                callStatusCollection.insert(CallStatus.builder()
+                        .callId(streamingStatusStartedDetail.getCallId())
+                        .callStatus(streamingStatus)
+                        .startTime(streamingStatusStartedDetail.getStartTime())
+                        .rowCreateTs(new Date())
+                        .build());
                 startKVSToTranscribeStreaming(streamingStatusStartedDetail);
+            } else {
+                final StreamingStatusEndedOrFailedDetail streamingDetail = objectMapper.convertValue(eventDetail,
+                        StreamingStatusEndedOrFailedDetail.class);
+                callStatusCollection.insert(CallStatus.builder()
+                        .callId(streamingDetail.getCallId())
+                        .callStatus(streamingStatus)
+                        .startTime(streamingDetail.getStartTime())
+                        .endTime(streamingDetail.getEndTime())
+                        .rowCreateTs(new Date())
+                        .build());
             }
 
             logger.info("Finished processing request");
@@ -129,7 +147,8 @@ public class KVSTranscribeStreamingHandler {
 
             logger.info("Calling Transcribe service..");
 
-            List<TranscriptionPublisher> publishers = Arrays.asList(new TranscriptionPublisherImpl(detail, transcriptsDB));
+            List<TranscriptionPublisher> publishers = Arrays.asList(new TranscriptionPublisherImpl(detail,
+                    transcriptsCollection));
 
             CompletableFuture<Void> result = client.startStreamTranscription(
                     // since we're definitely working with telephony audio, we know that's 8 kHz

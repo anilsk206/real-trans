@@ -1,4 +1,4 @@
-package com.aicoeinc.model.transcript;
+package com.aicoeinc.model.dbCollections;
 
 import lombok.*;
 import org.springframework.data.annotation.Id;
@@ -33,7 +33,8 @@ public class TranscriptResult  {
     private String fromNumber;
     private String toNumber;
     private String transcript;
+    private String callStatus;
 
     @Indexed
-    private Date row_create_ts;
+    private Date rowCreateTs;
 }

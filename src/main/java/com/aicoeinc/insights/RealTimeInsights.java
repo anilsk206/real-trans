@@ -1,19 +1,18 @@
 package com.aicoeinc.insights;
 
+import com.aicoeinc.db.CallStatusRepository;
 import com.aicoeinc.db.TranscriptsRepository;
+import com.aicoeinc.model.dbCollections.CallStatus;
 import com.aicoeinc.model.insights.*;
-import com.aicoeinc.model.transcript.TranscriptResult;
+import com.aicoeinc.model.dbCollections.TranscriptResult;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
-import com.fasterxml.jackson.databind.node.ObjectNode;
 import lombok.Getter;
 import lombok.Setter;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.data.mongodb.core.query.Criteria;
-import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
@@ -25,7 +24,6 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.*;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -36,6 +34,9 @@ public class RealTimeInsights {
 
     @Autowired
     TranscriptsRepository transcriptsRepository;
+
+    @Autowired
+    CallStatusRepository callStatusRepository;
 
     private static final String DEFAULT_REGION = "us-east-1";
 
@@ -48,7 +49,8 @@ public class RealTimeInsights {
     /* connect timeout */
     private static final int CONNECTION_TIMEOUT_IN_MILLIS = 10_000;
 
-    public static String[] entities = {"DISCOUNT",
+    public static String[] entities = {
+            "DISCOUNT",
             "PREMIUM",
             "REP_QUESTION",
             "DRIVEWISE",
@@ -56,9 +58,13 @@ public class RealTimeInsights {
             "ASK_FOR_SALE",
             "CUSTOMER_INTENT",
             "COMPETITOR",
-            "REP_SUGGEST_MULTILINE"};
+            "REP_SUGGEST_MULTILINE"
+    };
 
-    public Map<String, String> insights = new HashMap<>();
+    public InsightsResponse insights = InsightsResponse.builder()
+            .callStatus("Ongoing")
+            .insights(new HashMap<>())
+            .build();
 
     //    @Autowired
     private static RestTemplate restTemplate = new RestTemplate();
@@ -83,6 +89,11 @@ public class RealTimeInsights {
 
     public String getInsightsFor(String callId) {
         List<TranscriptResult> callTranscripts = getTranscripts(callId);
+
+        List<CallStatus> callStatusList = callStatusRepository.findByCallId(callId);
+        String callStatus = callStatusList.size() > 0 ? callStatusList.get(0).getCallStatus() : "UNKNOWN";
+
+        this.insights.setCallStatus(callStatus);
         InsightsRequest insightsRequest = getInsightRequest(callId, callTranscripts);
 
         //TODO: Make a call to Insights engine
@@ -90,25 +101,26 @@ public class RealTimeInsights {
 
         Map<String, String> insights = extractInsights(insightsResponse);
 
-        // For this Mock Service, just get a few insights at a time - so that we can show updates in UI
-        int insightsAtATime = 1;
+        // For a completed call, show all insights. Otherwise, stream 1 at a time
 
-        // While this code can be optimized to get the first element instead of creating subLists,
-        // keeping this as below to have quick edits if we want to show more than one insights each time.
-        List<String> insightsSubset = new ArrayList<String>(insights.keySet());
-        Collections.shuffle(insightsSubset);
-        List<String> insightsSubsetKeys = insightsAtATime > insightsSubset.size() ? insightsSubset.subList(0, insightsSubset.size()) :
-                insightsSubset.subList(0, insightsAtATime);
-        for (String insightsSubsetKey: insightsSubsetKeys) {
-            this.insights.put(insightsSubsetKey, insights.get(insightsSubsetKey));
+        if (!callStatus.equals("STARTED")) {
+            this.insights.setInsights(insights);
+        } else {
+            // For this Mock Service, just get a few insights at a time - so that we can show updates in UI
+            int insightsAtATime = 1;
+
+            // While this code can be optimized to get the first element instead of creating subLists,
+            // keeping this as below to have quick edits if we want to show more than one insights each time.
+            List<String> insightsSubset = new ArrayList<String>(insights.keySet());
+            Collections.shuffle(insightsSubset);
+            List<String> insightsSubsetKeys = insightsAtATime > insightsSubset.size() ?
+                    insightsSubset.subList(0, insightsSubset.size()) :
+                    insightsSubset.subList(0, insightsAtATime);
+            for (String insightsSubsetKey : insightsSubsetKeys) {
+                this.insights.getInsights().put(insightsSubsetKey, insights.get(insightsSubsetKey));
+            }
         }
 
-        //TODO: How can we show this as a table on frontend
-//        return this.insights.entrySet().stream()
-//                .map(entry -> entry.getKey() + " --> " + entry.getValue())
-//                .collect(Collectors.joining("\n\n"));
-
-        //TODO: The below code can be optimized to send a json. Frontend will handle the json and display however it wants.
         String insightsJson = "";
         try {
             insightsJson = objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(this.insights);
@@ -123,8 +135,8 @@ public class RealTimeInsights {
         String insights = "";
         try {
             insights = Files.readAllLines(Paths.get("/home/durga/Downloads/model_output1.json"))
-                            .stream()
-                            .collect(Collectors.joining());
+                    .stream()
+                    .collect(Collectors.joining());
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -137,7 +149,7 @@ public class RealTimeInsights {
         try {
             JsonNode insightsJson = objectMapper.readTree(insightsResponse);
             ArrayNode udpInsights = (ArrayNode) insightsJson.path("udpInsights");
-            for (JsonNode udpInsight: udpInsights) {
+            for (JsonNode udpInsight : udpInsights) {
                 insights.put(udpInsight.get("tagName").asText(), udpInsight.get("tagValue").asText());
             }
         } catch (JsonProcessingException e) {
@@ -151,36 +163,36 @@ public class RealTimeInsights {
         final List<TranscriptionItem> agentItems = new ArrayList<>();
         final List<TranscriptionItem> customerItems = new ArrayList<>();
         results.stream().forEach(result -> {
-                    String rttranscript = result.getTranscript();
-                    String channelId = result.getChannelId();
-                    try {
-                        JsonNode transcriptJson = objectMapper.readTree(rttranscript);
-                        ArrayNode rtitems = (ArrayNode) transcriptJson.path("results").get(0)
-                                .path("alternatives").get(0).path("items");
+            String rttranscript = result.getTranscript();
+            String channelId = result.getChannelId();
+            try {
+                JsonNode transcriptJson = objectMapper.readTree(rttranscript);
+                ArrayNode rtitems = (ArrayNode) transcriptJson.path("results").get(0)
+                        .path("alternatives").get(0).path("items");
 
-                        for (JsonNode item : rtitems) {
-                            TranscriptionItem transcriptionItem = TranscriptionItem.builder()
-                                    .start_time(item.get("startTime").asLong() / 1000 + "")
-                                    .end_time(item.get("endTime").asLong() / 1000 + "")
-                                    .alternatives(Arrays.asList(TranscriptionItemAlternatives.builder()
-                                            .confidence("1.0")
-                                            .content(item.get("content").asText())
-                                            .build()))
-                                    .type(item.get("type").asText())
-                                    .build();
+                for (JsonNode item : rtitems) {
+                    TranscriptionItem transcriptionItem = TranscriptionItem.builder()
+                            .start_time(item.get("startTime").asLong() / 1000 + "")
+                            .end_time(item.get("endTime").asLong() / 1000 + "")
+                            .alternatives(Arrays.asList(TranscriptionItemAlternatives.builder()
+                                    .confidence("1.0")
+                                    .content(item.get("content").asText())
+                                    .build()))
+                            .type(item.get("type").asText())
+                            .build();
 
-                            if (channelId.equals("agent")) {
-                                agentItems.add(transcriptionItem);
-                            } else {
-                                customerItems.add(transcriptionItem);
-                            }
-                        }
-                    } catch (JsonProcessingException e) {
-                        System.out.println("Error while transforming transcript with start time " + result.getStartTime()
-                                + " for channel id " + result.getChannelId());
-                        e.printStackTrace();
+                    if (channelId.equals("agent")) {
+                        agentItems.add(transcriptionItem);
+                    } else {
+                        customerItems.add(transcriptionItem);
                     }
-                });
+                }
+            } catch (JsonProcessingException e) {
+                System.out.println("Error while transforming transcript with start time " + result.getStartTime()
+                        + " for channel id " + result.getChannelId());
+                e.printStackTrace();
+            }
+        });
 
         // Merge all the agent and customer items
         List<TranscriptionItem> allItems = new ArrayList<>();
@@ -215,7 +227,7 @@ public class RealTimeInsights {
                                                         .channel_label("ch_1")
                                                         .items(customerItems)
                                                         .build()
-                                                ))
+                                        ))
                                         .number_of_channels(2)
                                         .build())
                                 .items(allItemsSorted)

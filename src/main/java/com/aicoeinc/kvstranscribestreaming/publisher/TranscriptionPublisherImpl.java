@@ -2,7 +2,7 @@ package com.aicoeinc.kvstranscribestreaming.publisher;
 
 import com.aicoeinc.db.TranscriptsRepository;
 import com.aicoeinc.model.streamingevent.StreamingStatusDetail;
-import com.aicoeinc.model.transcript.TranscriptResult;
+import com.aicoeinc.model.dbCollections.TranscriptResult;
 import com.fasterxml.jackson.annotation.JsonAutoDetect;
 import com.fasterxml.jackson.annotation.PropertyAccessor;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -88,7 +88,7 @@ public class TranscriptionPublisherImpl implements TranscriptionPublisher {
                 .toNumber(this.toNumber)
                 .voiceConnector(this.voiceConnector)
                 .transcript(transcriptJson)
-                .row_create_ts(new Date())
+                .rowCreateTs(new Date())
                 .build();
     }
 }
